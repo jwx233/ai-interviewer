@@ -1,10 +1,35 @@
-import type { InterviewQuestion, InterviewReport, InterviewTurn } from './types'
+import type { ChoiceOption, Difficulty, InterviewQuestion, InterviewReport, InterviewTurn, QuestionType } from './types'
+
+const optionIds = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+export function normalizeQuestion(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value
+  const raw = value as Record<string, unknown>
+  const options = Array.isArray(raw.options)
+    ? raw.options.map((option, index): ChoiceOption => typeof option === 'string'
+      ? { id: optionIds[index] ?? String(index + 1), text: option }
+      : option as ChoiceOption)
+    : undefined
+  const correctAnswers = Array.isArray(raw.correctAnswers)
+    ? raw.correctAnswers.map(String)
+    : typeof raw.correctAnswer === 'string'
+      ? [raw.correctAnswer]
+      : undefined
+  return {
+    ...raw,
+    id: typeof raw.id === 'string' && raw.id ? raw.id : crypto.randomUUID(),
+    type: raw.type as QuestionType,
+    difficulty: raw.difficulty as Difficulty,
+    options,
+    correctAnswers,
+  }
+}
 
 export function validateQuestion(value: unknown): value is InterviewQuestion {
   if (!value || typeof value !== 'object') return false
   const q = value as InterviewQuestion
   if (!q.id || !q.question || !q.topic || !['single_choice','multiple_choice','open_answer'].includes(q.type)) return false
-  if (q.type !== 'open_answer') return !!q.options?.length && !!q.correctAnswers?.length && q.correctAnswers.every((id) => q.options?.some((o) => o.id === id))
+  if (q.type !== 'open_answer') return !!q.options?.length && q.options.every((o) => !!o.id && !!o.text) && !!q.correctAnswers?.length && q.correctAnswers.every((id) => q.options?.some((o) => o.id === id))
   return true
 }
 export function scoreChoice(question: InterviewQuestion, answer: string[]) {
