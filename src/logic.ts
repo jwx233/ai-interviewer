@@ -3,26 +3,55 @@ import type { ChoiceOption, Difficulty, InterviewQuestion, InterviewReport, Inte
 
 const optionIds = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-export function normalizeQuestion(value: unknown): unknown {
+export function normalizeQuestion(value: unknown, defaults?: { difficulty?: Difficulty; topic?: string }): unknown {
   if (!value || typeof value !== 'object') return value
-  const raw = value as Record<string, unknown>
-  const options = Array.isArray(raw.options)
-    ? raw.options.map((option, index): ChoiceOption => typeof option === 'string'
-      ? { id: optionIds[index] ?? String(index + 1), text: option }
-      : option as ChoiceOption)
-    : undefined
-  const correctAnswers = Array.isArray(raw.correctAnswers)
-    ? raw.correctAnswers.map(String)
-    : typeof raw.correctAnswer === 'string'
-      ? [raw.correctAnswer]
+  const outer = value as Record<string, unknown>
+  const raw = outer.question && typeof outer.question === 'object' ? outer.question as Record<string, unknown> : outer
+  const rawOptions = Array.isArray(raw.options)
+    ? raw.options
+    : raw.options && typeof raw.options === 'object'
+      ? Object.entries(raw.options).map(([id, text]) => ({ id, text }))
       : undefined
+  const options = rawOptions
+    ? rawOptions.map((option, index): ChoiceOption => {
+      if (typeof option === 'string') return { id: optionIds[index] ?? String(index + 1), text: option }
+      const item = option as Record<string, unknown>
+      return {
+        id: String(item.id ?? item.key ?? item.label ?? optionIds[index] ?? index + 1),
+        text: String(item.text ?? item.content ?? item.value ?? item.label ?? ''),
+      }
+    })
+    : undefined
+  const rawAnswers = raw.correctAnswers ?? raw.correctAnswer ?? raw.answer
+  const correctAnswers = Array.isArray(rawAnswers)
+    ? rawAnswers.map(String)
+    : typeof rawAnswers === 'string' || typeof rawAnswers === 'number'
+      ? [String(rawAnswers)]
+      : undefined
+  const normalizedAnswers = correctAnswers?.map((answer) => {
+    const byId = options?.find((option) => option.id === answer)
+    if (byId) return byId.id
+    const byText = options?.find((option) => option.text === answer)
+    if (byText) return byText.id
+    const numericIndex = Number(answer)
+    return Number.isInteger(numericIndex) && numericIndex >= 0 && options?.[numericIndex] ? options[numericIndex].id : answer
+  })
+  const typeAliases: Record<string, QuestionType> = {
+    single: 'single_choice', single_choice: 'single_choice', 单选: 'single_choice', 单选题: 'single_choice',
+    multiple: 'multiple_choice', multiple_choice: 'multiple_choice', 多选: 'multiple_choice', 多选题: 'multiple_choice',
+    open: 'open_answer', open_answer: 'open_answer', 开放题: 'open_answer', 问答题: 'open_answer',
+  }
   return {
     ...raw,
     id: typeof raw.id === 'string' && raw.id ? raw.id : createId(),
-    type: raw.type as QuestionType,
-    difficulty: raw.difficulty as Difficulty,
+    question: typeof raw.question === 'string' ? raw.question : String(raw.title ?? raw.content ?? ''),
+    topic: typeof raw.topic === 'string' && raw.topic ? raw.topic : defaults?.topic ?? '综合能力',
+    type: typeAliases[String(raw.type ?? raw.questionType ?? '')] ?? raw.type as QuestionType,
+    difficulty: (raw.difficulty ?? defaults?.difficulty) as Difficulty,
     options,
-    correctAnswers,
+    correctAnswers: normalizedAnswers,
+    explanation: raw.explanation ?? raw.analysis,
+    referenceAnswer: raw.referenceAnswer ?? raw.reference,
   }
 }
 
