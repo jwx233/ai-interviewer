@@ -72,6 +72,10 @@ export function normalizeQuestions(value: unknown, defaults?: { difficulty?: Dif
 export function mergeReview(turns: InterviewTurn[], review: InterviewReview) {
   return turns.map((turn, index) => ({ ...turn, evaluation: review.evaluations[index] ?? turn.evaluation }))
 }
+export function clampScore(value: unknown) {
+  const score = Number(value)
+  return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0
+}
 export function buildLocalEvaluation(turn: InterviewTurn): TurnEvaluation {
   const score = turn.skipped ? 0 : turn.question.type === 'open_answer'
     ? (String(turn.answer).length > 60 ? 75 : 55)
@@ -92,10 +96,57 @@ export function scoreChoice(question: InterviewQuestion, answer: string[]) {
   return expected.length ? Math.round((hits / expected.length) * 60) : 0
 }
 export function buildLocalReport(turns: InterviewTurn[]): InterviewReport {
-  const scores = turns.map((turn) => turn.evaluation?.score ?? buildLocalEvaluation(turn).score)
+  const scores = turns.map((turn) => clampScore(turn.evaluation?.score ?? buildLocalEvaluation(turn).score))
   const totalScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0
   const wrong = turns.filter((turn,index)=>scores[index]<70).map((turn)=>turn.question.topic)
   return { totalScore, dimensions:{'技术准确性':totalScore,'表达结构':Math.min(100,totalScore+3),'项目深度':Math.max(0,totalScore-5),'岗位匹配度':totalScore,'应变能力':Math.min(100,totalScore+1)},summary:totalScore>=80?'整体表现扎实，具备良好的岗位基础。':'基础能力已体现，建议针对薄弱主题继续练习。',strengths:['能够完成完整面试流程','对主要问题给出了有效回应'],weaknesses:[...new Set(wrong)].slice(0,4),learningPlan:['复盘本次错题与参考答案','使用 STAR 法重写项目经历','针对薄弱主题完成一次专项练习'] }
+}
+export function normalizeReviewScores(turns: InterviewTurn[], review: InterviewReview): InterviewReview {
+  const evaluations = turns.map((turn, index): TurnEvaluation => {
+    const fallback = buildLocalEvaluation(turn)
+    const raw = review.evaluations[index]
+    const score = turn.skipped
+      ? 0
+      : turn.question.type === 'open_answer'
+        ? clampScore(raw?.score ?? fallback.score)
+        : scoreChoice(turn.question, turn.answer as string[])
+    return {
+      ...fallback,
+      ...raw,
+      score,
+      strengths: Array.isArray(raw?.strengths) ? raw.strengths : fallback.strengths,
+      improvements: Array.isArray(raw?.improvements) ? raw.improvements : fallback.improvements,
+      followUpNeeded: Boolean(raw?.followUpNeeded),
+    }
+  })
+  const scoredTurns = turns.map((turn, index) => ({ ...turn, evaluation: evaluations[index] }))
+  const fallbackReport = buildLocalReport(scoredTurns)
+  const totalScore = evaluations.length
+    ? Math.round(evaluations.reduce((sum, evaluation) => sum + evaluation.score, 0) / evaluations.length)
+    : 0
+  const dimensionNames = ['技术准确性', '表达结构', '项目深度', '岗位匹配度', '应变能力']
+  const rawDimensionValues = dimensionNames.map((name) => Number(review.report?.dimensions?.[name]))
+  const usesThirtyPointScale = Number(review.report?.totalScore) <= 30
+    && totalScore > 30
+    && rawDimensionValues.every((score) => Number.isFinite(score) && score >= 0 && score <= 30)
+  const dimensions = Object.fromEntries(dimensionNames.map((name) => [
+    name,
+    clampScore(usesThirtyPointScale
+      ? Number(review.report.dimensions[name]) / 30 * 100
+      : review.report?.dimensions?.[name] ?? fallbackReport.dimensions[name] ?? totalScore),
+  ]))
+  return {
+    evaluations,
+    report: {
+      ...fallbackReport,
+      ...review.report,
+      totalScore,
+      dimensions,
+      strengths: Array.isArray(review.report?.strengths) ? review.report.strengths : fallbackReport.strengths,
+      weaknesses: Array.isArray(review.report?.weaknesses) ? review.report.weaknesses : fallbackReport.weaknesses,
+      learningPlan: Array.isArray(review.report?.learningPlan) ? review.report.learningPlan : fallbackReport.learningPlan,
+    },
+  }
 }
 export function parseJsonObject(text: string) {
   const cleaned = text.replace(/^```json\s*/i,'').replace(/```$/,'').trim()
