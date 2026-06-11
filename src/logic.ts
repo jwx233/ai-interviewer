@@ -1,5 +1,5 @@
 import { createId } from './id'
-import type { ChoiceOption, Difficulty, InterviewQuestion, InterviewReport, InterviewTurn, QuestionType } from './types'
+import type { ChoiceOption, Difficulty, InterviewQuestion, InterviewReport, InterviewReview, InterviewTurn, QuestionType, TurnEvaluation } from './types'
 
 const optionIds = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
@@ -62,6 +62,28 @@ export function validateQuestion(value: unknown): value is InterviewQuestion {
   if (q.type !== 'open_answer') return !!q.options?.length && q.options.every((o) => !!o.id && !!o.text) && !!q.correctAnswers?.length && q.correctAnswers.every((id) => q.options?.some((o) => o.id === id))
   return true
 }
+export function normalizeQuestions(value: unknown, defaults?: { difficulty?: Difficulty; topic?: string }) {
+  const raw = value && typeof value === 'object' && !Array.isArray(value)
+    ? ((value as Record<string, unknown>).questions ?? value)
+    : value
+  if (!Array.isArray(raw)) return []
+  return raw.map((question) => normalizeQuestion(question, defaults)).filter(validateQuestion)
+}
+export function mergeReview(turns: InterviewTurn[], review: InterviewReview) {
+  return turns.map((turn, index) => ({ ...turn, evaluation: review.evaluations[index] ?? turn.evaluation }))
+}
+export function buildLocalEvaluation(turn: InterviewTurn): TurnEvaluation {
+  const score = turn.skipped ? 0 : turn.question.type === 'open_answer'
+    ? (String(turn.answer).length > 60 ? 75 : 55)
+    : scoreChoice(turn.question, turn.answer as string[])
+  return {
+    score,
+    feedback: turn.skipped ? '本题已跳过。' : score >= 80 ? '回答准确且结构较完整。' : '建议结合参考答案进一步补充关键点。',
+    strengths: score >= 80 ? ['回答覆盖了主要考点'] : [],
+    improvements: score < 80 ? ['补充关键概念、方案取舍与实际结果'] : [],
+    followUpNeeded: false,
+  }
+}
 export function scoreChoice(question: InterviewQuestion, answer: string[]) {
   const expected = [...(question.correctAnswers ?? [])].sort()
   const actual = [...answer].sort()
@@ -70,7 +92,7 @@ export function scoreChoice(question: InterviewQuestion, answer: string[]) {
   return expected.length ? Math.round((hits / expected.length) * 60) : 0
 }
 export function buildLocalReport(turns: InterviewTurn[]): InterviewReport {
-  const scores = turns.map((turn) => turn.evaluation?.score ?? (turn.question.type === 'open_answer' ? (String(turn.answer).length > 60 ? 75 : 55) : scoreChoice(turn.question, turn.answer as string[])))
+  const scores = turns.map((turn) => turn.evaluation?.score ?? buildLocalEvaluation(turn).score)
   const totalScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0
   const wrong = turns.filter((turn,index)=>scores[index]<70).map((turn)=>turn.question.topic)
   return { totalScore, dimensions:{'技术准确性':totalScore,'表达结构':Math.min(100,totalScore+3),'项目深度':Math.max(0,totalScore-5),'岗位匹配度':totalScore,'应变能力':Math.min(100,totalScore+1)},summary:totalScore>=80?'整体表现扎实，具备良好的岗位基础。':'基础能力已体现，建议针对薄弱主题继续练习。',strengths:['能够完成完整面试流程','对主要问题给出了有效回应'],weaknesses:[...new Set(wrong)].slice(0,4),learningPlan:['复盘本次错题与参考答案','使用 STAR 法重写项目经历','针对薄弱主题完成一次专项练习'] }

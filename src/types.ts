@@ -8,4 +8,6 @@ export interface TurnEvaluation { score: number; feedback: string; strengths: st
 export interface InterviewTurn { question: InterviewQuestion; answer: string | string[]; evaluation?: TurnEvaluation; skipped?: boolean }
 export interface InterviewConfig { role: Role; customRole: string; difficulty: Difficulty; duration: 10 | 20 | 30; resume: string; jd: string }
 export interface InterviewReport { totalScore: number; dimensions: Record<string, number>; summary: string; strengths: string[]; weaknesses: string[]; learningPlan: string[] }
-export interface InterviewSession { id: string; config: InterviewConfig; profile?: CandidateProfile; turns: InterviewTurn[]; currentQuestion?: InterviewQuestion; startedAt: number; status: 'active' | 'completed'; report?: InterviewReport; aiMode: boolean }
+export interface InterviewPreparation { profile?: CandidateProfile; questions: InterviewQuestion[] }
+export interface InterviewReview { evaluations: TurnEvaluation[]; report: InterviewReport }
+export interface InterviewSession { id: string; config: InterviewConfig; profile?: CandidateProfile; questions: InterviewQuestion[]; turns: InterviewTurn[]; currentQuestion?: InterviewQuestion; startedAt: number; status: 'active' | 'reviewing' | 'completed'; report?: InterviewReport; aiMode: boolean; reviewStatus?: 'waiting' | 'ai_completed' | 'local_fallback'; reviewError?: string }
