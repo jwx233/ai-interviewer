@@ -1,3 +1,4 @@
+import { createId } from './id'
 import type { ChoiceOption, Difficulty, InterviewQuestion, InterviewReport, InterviewTurn, QuestionType } from './types'
 
 const optionIds = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -17,7 +18,7 @@ export function normalizeQuestion(value: unknown): unknown {
       : undefined
   return {
     ...raw,
-    id: typeof raw.id === 'string' && raw.id ? raw.id : crypto.randomUUID(),
+    id: typeof raw.id === 'string' && raw.id ? raw.id : createId(),
     type: raw.type as QuestionType,
     difficulty: raw.difficulty as Difficulty,
     options,

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { analyzeCandidate, evaluateAnswer, generateQuestion, generateReport, hasAi } from './ai'
+import { createId } from './id'
 import { buildLocalReport, scoreChoice } from './logic'
 import { getLocalQuestions } from './localQuestions'
 import { deleteSession, listSessions, saveSession } from './storage'
@@ -7,7 +8,7 @@ import type { Difficulty, InterviewConfig, InterviewQuestion, InterviewReport, I
 
 const roles:Role[]=['Java 后端','前端开发','软件测试','产品经理','自定义岗位']
 const defaultConfig:InterviewConfig={role:'Java 后端',customRole:'',difficulty:'中级',duration:20,resume:'',jd:''}
-const uid=()=>crypto.randomUUID()
+const uid=createId
 type SpeechRecognitionLike={lang:string;interimResults:boolean;onresult?:(event:{results:ArrayLike<{0:{transcript:string}}>} )=>void;onerror?:()=>void;onend?:()=>void;start:()=>void}
 const SpeechRecognitionCtor=()=>((window as unknown as {SpeechRecognition?:new()=>SpeechRecognitionLike;webkitSpeechRecognition?:new()=>SpeechRecognitionLike}).SpeechRecognition||(window as unknown as {webkitSpeechRecognition?:new()=>SpeechRecognitionLike}).webkitSpeechRecognition)
 
