@@ -1,7 +1,13 @@
 import { createId } from './id'
-import type { ChoiceOption, Difficulty, InterviewQuestion, InterviewReport, InterviewReview, InterviewSession, InterviewTurn, QuestionType, TurnEvaluation } from './types'
+import type { ChoiceOption, Difficulty, InterviewConfig, InterviewQuestion, InterviewReport, InterviewReview, InterviewSession, InterviewTurn, QuestionType, TurnEvaluation } from './types'
 
 const optionIds = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+export function validateInterviewConfig(config: InterviewConfig) {
+  if (!config.role) return '请先选择一个目标岗位，再开始模拟面试。'
+  if (config.role === '自定义岗位' && !config.customRole.trim()) return '请输入自定义岗位名称。'
+  return ''
+}
 
 export function normalizeQuestion(value: unknown, defaults?: { difficulty?: Difficulty; topic?: string }): unknown {
   if (!value || typeof value !== 'object') return value
