@@ -6,7 +6,7 @@ export interface ChoiceOption { id: string; text: string }
 export interface InterviewQuestion { id: string; type: QuestionType; question: string; topic: string; difficulty: Difficulty; options?: ChoiceOption[]; correctAnswers?: string[]; explanation?: string; referenceAnswer?: string }
 export interface TurnEvaluation { score: number; feedback: string; strengths: string[]; improvements: string[]; followUpNeeded: boolean }
 export interface InterviewTurn { question: InterviewQuestion; answer: string | string[]; evaluation?: TurnEvaluation; skipped?: boolean }
-export interface InterviewConfig { role: Role; customRole: string; difficulty: Difficulty; duration: 10 | 20 | 30; resume: string; jd: string }
+export interface InterviewConfig { role: Role | ''; customRole: string; difficulty: Difficulty; duration: 10 | 20 | 30; resume: string; jd: string }
 export interface InterviewReport { totalScore: number; dimensions: Record<string, number>; summary: string; strengths: string[]; weaknesses: string[]; learningPlan: string[] }
 export interface InterviewPreparation { profile?: CandidateProfile; questions: InterviewQuestion[] }
 export interface InterviewReview { evaluations: TurnEvaluation[]; report: InterviewReport }

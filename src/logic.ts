@@ -72,6 +72,15 @@ export function normalizeQuestions(value: unknown, defaults?: { difficulty?: Dif
 export function mergeReview(turns: InterviewTurn[], review: InterviewReview) {
   return turns.map((turn, index) => ({ ...turn, evaluation: review.evaluations[index] ?? turn.evaluation }))
 }
+export function fillSkippedTurns(questions: InterviewQuestion[], turns: InterviewTurn[]) {
+  const answeredIds = new Set(turns.map((turn) => turn.question.id))
+  return [
+    ...turns,
+    ...questions
+      .filter((question) => !answeredIds.has(question.id))
+      .map((question): InterviewTurn => ({ question, answer: '', skipped: true })),
+  ]
+}
 export function clampScore(value: unknown) {
   const score = Number(value)
   return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0
