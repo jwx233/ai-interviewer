@@ -1,5 +1,5 @@
 import { createId } from './id'
-import type { ChoiceOption, Difficulty, InterviewQuestion, InterviewReport, InterviewReview, InterviewTurn, QuestionType, TurnEvaluation } from './types'
+import type { ChoiceOption, Difficulty, InterviewQuestion, InterviewReport, InterviewReview, InterviewSession, InterviewTurn, QuestionType, TurnEvaluation } from './types'
 
 const optionIds = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
@@ -105,11 +105,7 @@ export function normalizeReviewScores(turns: InterviewTurn[], review: InterviewR
   const evaluations = turns.map((turn, index): TurnEvaluation => {
     const fallback = buildLocalEvaluation(turn)
     const raw = review.evaluations[index]
-    const score = turn.skipped
-      ? 0
-      : turn.question.type === 'open_answer'
-        ? clampScore(raw?.score ?? fallback.score)
-        : scoreChoice(turn.question, turn.answer as string[])
+    const score = turn.skipped ? 0 : clampScore(raw?.score)
     return {
       ...fallback,
       ...raw,
@@ -147,6 +143,27 @@ export function normalizeReviewScores(turns: InterviewTurn[], review: InterviewR
       learningPlan: Array.isArray(review.report?.learningPlan) ? review.report.learningPlan : fallbackReport.learningPlan,
     },
   }
+}
+export function canRetryAiReview(session: InterviewSession) {
+  return session.status === 'completed'
+    && session.reviewStatus !== 'ai_completed'
+    && session.turns.length > 0
+}
+export function formatInterviewAnswers(turns: InterviewTurn[]) {
+  return turns.map((turn, index) => {
+    const options = turn.question.options?.length
+      ? `\n${turn.question.options.map((option) => `${option.id}. ${option.text}`).join('\n')}`
+      : ''
+    const answer = turn.skipped
+      ? '已跳过'
+      : Array.isArray(turn.answer)
+        ? turn.answer.map((id) => {
+          const option = turn.question.options?.find((item) => item.id === id)
+          return option ? `${option.id}. ${option.text}` : id
+        }).join('；')
+        : turn.answer || '未回答'
+    return `## 问题 ${index + 1}\n${turn.question.question}${options}\n\n我的回答：${answer}`
+  }).join('\n\n')
 }
 export function parseJsonObject(text: string) {
   const cleaned = text.replace(/^```json\s*/i,'').replace(/```$/,'').trim()

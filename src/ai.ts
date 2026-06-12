@@ -30,6 +30,7 @@ export async function prepareInterview(config:InterviewConfig,count:number):Prom
 export async function reviewInterview(config:InterviewConfig,turns:InterviewTurn[]):Promise<InterviewReview>{
   const compactTurns=turns.map((turn,index)=>({index,question:turn.question,answer:turn.answer,skipped:turn.skipped}))
   const raw=await request<InterviewReview>('你是资深面试复盘专家。一次性评价所有回答，仅返回合法 JSON，不要 Markdown。结构为 {"evaluations":[{"score":0,"feedback":"","strengths":[],"improvements":[],"followUpNeeded":false}],"report":{"totalScore":0,"dimensions":{"技术准确性":0,"表达结构":0,"项目深度":0,"岗位匹配度":0,"应变能力":0},"summary":"","strengths":[],"weaknesses":[],"learningPlan":[]}}。evaluations 必须与输入题目数量和顺序完全一致；选择题结合正确答案评分，开放题结合参考答案、准确性、表达和项目深度评分。每道题的 score、totalScore 和五个 dimensions 都必须采用 0 到 100 的百分制，禁止使用 5 分制、10 分制或 30 分制；程序会根据逐题 score 的平均值重新计算总分。',JSON.stringify({config,turns:compactTurns}),true,Math.max(5000,turns.length*700))
-  if(!Array.isArray(raw.evaluations)||raw.evaluations.length!==turns.length||!raw.report)throw new Error('AI 总结结构不完整，已保留回答。')
+  const dimensions=['技术准确性','表达结构','项目深度','岗位匹配度','应变能力']
+  if(!Array.isArray(raw.evaluations)||raw.evaluations.length!==turns.length||raw.evaluations.some(item=>!Number.isFinite(Number(item?.score)))||!raw.report||dimensions.some(name=>!Number.isFinite(Number(raw.report.dimensions?.[name]))))throw new Error('AI 总结结构不完整，已保留回答，请在历史记录中重试。')
   return normalizeReviewScores(turns,raw)
 }
